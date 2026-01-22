@@ -1,8 +1,11 @@
 /**
- * useSections Hook
- * =================
- * Manages resume sections (Experience, Education, Skills, etc.)
- * Supports nested sections and ATS-friendly structure.
+ * useSections Hook (ENHANCED)
+ * ============================
+ * Manages resume sections with:
+ * - Auto-reordering when dragging sections
+ * - Overlap prevention
+ * - Dynamic reorganization
+ * - Support for bullets and subsections
  */
 
 import { useState, useCallback } from 'react';
@@ -11,6 +14,8 @@ import { SECTION_TYPES, ATS_SECTION_HEADERS } from '../utils/constants';
 
 export function useSections(initialSections = []) {
   const [sections, setSections] = useState(initialSections);
+  const [bulletLists, setBulletLists] = useState([]);
+  const [subsections, setSubsections] = useState([]);
 
   /**
    * Add a new section with ATS-friendly defaults
@@ -28,8 +33,8 @@ export function useSections(initialSections = []) {
       borderColor: '#e5e7eb',
       contentType: 'text',
       direction: 'vertical',
-      atsHeader: config.atsHeader || null, // Maps to standard ATS headers
-      readingOrder: sections.length + 1,    // For ATS reading order
+      atsHeader: config.atsHeader || null,
+      readingOrder: sections.length + 1,
       ...config
     });
 
@@ -58,7 +63,7 @@ export function useSections(initialSections = []) {
    */
   const updateSection = useCallback((id, updates) => {
     setSections(prev => prev.map(sec =>
-      sec.id === id ? { ...sec, ...updates } : sec
+        sec.id === id ? { ...sec, ...updates } : sec
     ));
   }, []);
 
@@ -68,72 +73,154 @@ export function useSections(initialSections = []) {
   const deleteSections = useCallback((ids) => {
     const idSet = new Set(ids);
     setSections(prev => prev.filter(sec => !idSet.has(sec.id)));
+    // Also remove associated bullets and subsections
+    setBulletLists(prev => prev.filter(bl => !idSet.has(bl.parentSection)));
+    setSubsections(prev => prev.filter(sub => !idSet.has(sub.parentSection)));
   }, []);
 
   /**
-   * Add content to a section based on its type
+   * Add bullet list
    */
-  const addContentToSection = useCallback((section, position = {}) => {
-    if (!section) return null;
-
-    const { x = section.x + 20, y = section.y + 50 } = position;
-    
-    // Calculate next position based on existing content
-    const childElements = []; // Would be passed from parent
-    const childSections = sections.filter(s => s.parentSection === section.id);
-
-    let nextY = y;
-    if (section.direction === 'vertical' && childSections.length > 0) {
-      const lastChild = childSections[childSections.length - 1];
-      nextY = lastChild.y + lastChild.height + 10;
-    }
-
-    // Return config for element/section to be created
-    const contentConfig = {
-      parentSection: section.id,
-      x: section.direction === 'horizontal' ? x : section.x + 15,
-      y: nextY
+  const addBulletList = useCallback((config) => {
+    const newBulletList = {
+      id: generateId('bullets'),
+      ...config
     };
+    setBulletLists(prev => [...prev, newBulletList]);
+    return newBulletList;
+  }, []);
 
-    if (section.contentType === 'list-sections') {
-      // Create a subsection
-      return {
-        type: 'section',
-        config: {
-          ...contentConfig,
-          title: 'Entry',
-          width: section.width - 30,
-          height: 100,
-          contentType: 'text'
-        }
-      };
-    }
+  /**
+   * Update bullet list
+   */
+  const updateBulletList = useCallback((id, updates) => {
+    setBulletLists(prev => prev.map(bl =>
+        bl.id === id ? { ...bl, ...updates } : bl
+    ));
+  }, []);
 
-    // Create an element
-    return {
-      type: 'element',
-      config: {
-        ...contentConfig,
-        type: section.contentType === 'list-items' ? 'list-item' : 'text',
-        content: section.contentType === 'list-items' ? '• New item' : 'New text',
-        width: Math.min(section.width - 30, 450),
-        height: 30
-      }
+  /**
+   * Add subsection
+   */
+  const addSubsection = useCallback((config) => {
+    const newSubsection = {
+      id: generateId('subsection'),
+      fieldValues: {},
+      ...config
     };
+    setSubsections(prev => [...prev, newSubsection]);
+    return newSubsection;
+  }, []);
+
+  /**
+   * Update subsection
+   */
+  const updateSubsection = useCallback((id, updates) => {
+    setSubsections(prev => prev.map(sub =>
+        sub.id === id ? { ...sub, ...updates } : sub
+    ));
+  }, []);
+
+  /**
+   * Auto-reorder sections when one is dragged
+   * Prevents overlaps and reorganizes dynamically
+   */
+  const autoReorderSections = useCallback((draggedId, newY) => {
+    setSections(prev => {
+      const draggedSection = prev.find(s => s.id === draggedId);
+      if (!draggedSection) return prev;
+
+      // Filter out dragged section and sort remaining by Y position
+      const otherSections = prev
+          .filter(s => s.id !== draggedId && !s.parentSection)
+          .sort((a, b) => a.y - b.y);
+
+      // Find where to insert the dragged section
+      let insertIndex = otherSections.findIndex(s => s.y > newY);
+      if (insertIndex === -1) insertIndex = otherSections.length;
+
+      // Insert dragged section at new position
+      const reordered = [
+        ...otherSections.slice(0, insertIndex),
+        { ...draggedSection, y: newY },
+        ...otherSections.slice(insertIndex)
+      ];
+
+      // Reorganize sections to prevent overlap
+      let currentY = 50; // Starting Y position
+      const spacing = 20; // Gap between sections
+
+      return reordered.map(section => {
+        const adjustedY = currentY;
+        currentY += section.height + spacing;
+        return {
+          ...section,
+          y: adjustedY,
+          readingOrder: reordered.indexOf(section) + 1
+        };
+      });
+    });
+  }, []);
+
+  /**
+   * Check if section overlaps with others
+   */
+  const checkOverlap = useCallback((section, ignoredIds = []) => {
+    const ignoreSet = new Set(ignoredIds);
+
+    return sections.some(other => {
+      if (other.id === section.id || ignoreSet.has(other.id)) return false;
+
+      // Check bounding box overlap
+      return !(
+          section.x + section.width < other.x ||
+          section.x > other.x + other.width ||
+          section.y + section.height < other.y ||
+          section.y > other.y + other.height
+      );
+    });
   }, [sections]);
 
   /**
-   * Reorder sections for ATS reading order
+   * Reposition section to avoid overlaps
    */
-  const reorderSections = useCallback((orderedIds) => {
+  const repositionToAvoidOverlap = useCallback((sectionId) => {
     setSections(prev => {
-      const sectionMap = new Map(prev.map(sec => [sec.id, sec]));
-      return orderedIds
-        .filter(id => sectionMap.has(id))
-        .map((id, index) => ({
-          ...sectionMap.get(id),
-          readingOrder: index + 1
-        }));
+      const section = prev.find(s => s.id === sectionId);
+      if (!section) return prev;
+
+      const otherSections = prev
+          .filter(s => s.id !== sectionId && !s.parentSection)
+          .sort((a, b) => a.y - b.y);
+
+      // Find a non-overlapping Y position
+      let newY = section.y;
+      let overlapping = true;
+      const maxAttempts = 20;
+      let attempts = 0;
+
+      while (overlapping && attempts < maxAttempts) {
+        overlapping = otherSections.some(other => {
+          return !(
+              newY + section.height < other.y ||
+              newY > other.y + other.height
+          );
+        });
+
+        if (overlapping) {
+          // Find the next available spot
+          const blockingSection = otherSections.find(other =>
+              !(newY + section.height < other.y || newY > other.y + other.height)
+          );
+          if (blockingSection) {
+            newY = blockingSection.y + blockingSection.height + 20;
+          }
+        }
+
+        attempts++;
+      }
+
+      return prev.map(s => s.id === sectionId ? { ...s, y: newY } : s);
     });
   }, []);
 
@@ -142,15 +229,15 @@ export function useSections(initialSections = []) {
    */
   const getSectionHierarchy = useCallback(() => {
     const rootSections = sections.filter(s => !s.parentSection);
-    
+
     const buildHierarchy = (parentId = null) => {
       return sections
-        .filter(s => s.parentSection === parentId)
-        .sort((a, b) => (a.readingOrder || 0) - (b.readingOrder || 0))
-        .map(section => ({
-          ...section,
-          children: buildHierarchy(section.id)
-        }));
+          .filter(s => s.parentSection === parentId)
+          .sort((a, b) => (a.readingOrder || 0) - (b.readingOrder || 0))
+          .map(section => ({
+            ...section,
+            children: buildHierarchy(section.id)
+          }));
     };
 
     return buildHierarchy(null);
@@ -160,26 +247,18 @@ export function useSections(initialSections = []) {
    * Find section at a point (for drop targeting)
    */
   const findSectionAtPoint = useCallback((x, y) => {
-    // Search from top (highest z-index) to bottom
     for (let i = sections.length - 1; i >= 0; i--) {
       const section = sections[i];
       if (
-        x >= section.x &&
-        x <= section.x + section.width &&
-        y >= section.y &&
-        y <= section.y + section.height
+          x >= section.x &&
+          x <= section.x + section.width &&
+          y >= section.y &&
+          y <= section.y + section.height
       ) {
         return section;
       }
     }
     return null;
-  }, [sections]);
-
-  /**
-   * Get all child sections
-   */
-  const getChildSections = useCallback((parentId) => {
-    return sections.filter(s => s.parentSection === parentId);
   }, [sections]);
 
   return {
@@ -189,10 +268,22 @@ export function useSections(initialSections = []) {
     addATSSection,
     updateSection,
     deleteSections,
-    addContentToSection,
-    reorderSections,
+
+    // Bullet lists
+    bulletLists,
+    addBulletList,
+    updateBulletList,
+
+    // Subsections
+    subsections,
+    addSubsection,
+    updateSubsection,
+
+    // Reordering
+    autoReorderSections,
+    checkOverlap,
+    repositionToAvoidOverlap,
     getSectionHierarchy,
-    findSectionAtPoint,
-    getChildSections
+    findSectionAtPoint
   };
 }

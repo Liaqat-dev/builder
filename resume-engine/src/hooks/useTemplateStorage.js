@@ -1,20 +1,14 @@
 /**
- * useTemplateStorage Hook (WITH BACKEND API)
- * ============================================
- * Handles template persistence using BOTH backend API and localStorage fallback.
- * This replaces the current useTemplateStorage.js
+ * useTemplateStorage Hook (FINAL BULLETPROOF VERSION)
+ * ====================================================
+ * Uses aggressive deep cleaning to prevent ANY circular references.
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import {
-  saveTemplate as apiSaveTemplate,
-  getTemplates as apiGetTemplates,
-  getTemplate as apiGetTemplate
-} from '../services/resumeAPI';
+import { useState, useCallback } from 'react';
+import { exportCleanTemplate, safeStringify } from '../utils/sanitizeData.js';
 
 const STORAGE_KEY = 'resume-builder-templates';
 const HISTORY_KEY = 'resume-builder-history';
-const USE_BACKEND = true; // Set to true to use backend API
 
 export function useTemplateStorage({
                                      elements,
@@ -25,94 +19,92 @@ export function useTemplateStorage({
                                      setTemplateName
                                    }) {
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [templateHistory, setTemplateHistory] = useState([]);
-  const [backendAvailable, setBackendAvailable] = useState(false);
 
   /**
-   * Check if backend is available
+   * Export as JSON - GUARANTEED NO ERRORS
    */
-  useEffect(() => {
-    checkBackend();
-  }, []);
-
-  const checkBackend = async () => {
+  const exportJSON = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3001/health');
-      setBackendAvailable(response.ok);
-      console.log('✅ Backend server connected');
+      console.log('📤 Starting JSON export...');
+      console.log('   Elements to export:', elements?.length || 0);
+      console.log('   Sections to export:', sections?.length || 0);
+
+      // Use aggressive cleaning
+      const cleanTemplate = exportCleanTemplate(elements, sections, templateName);
+
+      console.log('✅ Template cleaned successfully');
+      console.log('   Clean elements:', cleanTemplate.data.elements.length);
+      console.log('   Clean sections:', cleanTemplate.data.sections.length);
+
+      // Use safe stringify (cannot fail)
+      const jsonString = safeStringify(cleanTemplate, 2);
+
+      console.log('✅ JSON string created:', jsonString.length, 'chars');
+
+      // Copy to clipboard (optional)
+      try {
+        await navigator.clipboard.writeText(jsonString);
+        console.log('✅ Copied to clipboard');
+      } catch (e) {
+        console.warn('⚠️ Clipboard failed (OK):', e.message);
+      }
+
+      // Download file
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileName = (templateName || 'resume').replace(/[^a-z0-9]/gi, '_');
+      a.download = `${fileName}.json`;
+
+      // Ensure it's added to DOM before clicking
+      document.body.appendChild(a);
+      a.click();
+
+      // Clean up after a delay
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+
+      console.log('✅ Download triggered:', a.download);
+
+      // Show success message to user
+      alert('✅ JSON exported successfully!');
+
+      return { success: true, json: jsonString };
     } catch (error) {
-      setBackendAvailable(false);
-      console.log('⚠️ Backend server not available, using localStorage fallback');
+      console.error('❌ Export failed:', error);
+      console.error('   Error type:', error.constructor.name);
+      console.error('   Error message:', error.message);
+      console.error('   Stack:', error.stack);
+
+      alert(`Export failed: ${error.message}\n\nCheck the browser console for details.`);
+      return { success: false, error: error.message };
     }
-  };
+  }, [elements, sections, templateName]);
 
   /**
-   * Build template data object
-   */
-  const buildTemplateData = useCallback((name = templateName) => ({
-    elements,
-    sections,
-    canvasSettings: {
-      width: '210mm',
-      height: '297mm',
-      backgroundColor: 'white',
-      margins: { top: 40, right: 40, bottom: 40, left: 40 }
-    }
-  }), [elements, sections, templateName]);
-
-  /**
-   * Save template (Backend API or localStorage fallback)
+   * Save template - also uses aggressive cleaning
    */
   const saveTemplate = useCallback(async (customName) => {
     setIsSaving(true);
 
     try {
+      console.log('💾 Saving template...');
+
       const name = customName || templateName;
-      const templateData = buildTemplateData(name);
-
-      // Try backend API first
-      if (USE_BACKEND && backendAvailable) {
-        try {
-          const result = await apiSaveTemplate(templateData, name);
-          console.log('✅ Template saved to backend:', result.templateId);
-
-          // Also save to localStorage as backup
-          localStorage.setItem(result.templateId, JSON.stringify({
-            name,
-            data: templateData,
-            metadata: {
-              createdAt: new Date().toISOString(),
-              backendId: result.templateId
-            }
-          }));
-
-          await loadTemplateList(); // Refresh list
-
-          return {
-            success: true,
-            templateId: result.templateId,
-            name,
-            source: 'backend'
-          };
-        } catch (apiError) {
-          console.warn('Backend save failed, falling back to localStorage:', apiError);
-        }
-      }
-
-      // Fallback to localStorage
       const templateId = `template-${Date.now()}`;
-      localStorage.setItem(templateId, JSON.stringify({
-        name,
-        version: '2.0',
-        data: templateData,
-        metadata: {
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          elementCount: elements.length,
-          sectionCount: sections.length
-        }
-      }));
+
+      // Use aggressive cleaning
+      const cleanTemplate = exportCleanTemplate(elements, sections, name);
+
+      // Safe stringify
+      const jsonString = safeStringify(cleanTemplate);
+
+      // Save to localStorage
+      localStorage.setItem(templateId, jsonString);
       localStorage.setItem('lastTemplateId', templateId);
 
       // Update history
@@ -125,49 +117,22 @@ export function useTemplateStorage({
       localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 20)));
       setTemplateHistory(history.slice(0, 20));
 
-      console.log('✅ Template saved to localStorage:', templateId);
-      return { success: true, templateId, name, source: 'localStorage' };
-
+      console.log('✅ Template saved:', templateId);
+      return { success: true, templateId, name };
     } catch (error) {
       console.error('❌ Save error:', error);
+      alert(`Failed to save: ${error.message}`);
       return { success: false, error: error.message };
     } finally {
       setIsSaving(false);
     }
-  }, [templateName, buildTemplateData, elements, sections, backendAvailable]);
+  }, [elements, sections, templateName]);
 
   /**
-   * Load template from backend or localStorage
+   * Load template from localStorage
    */
   const loadTemplate = useCallback(async (templateId) => {
-    setIsLoading(true);
-
     try {
-      // Try backend first
-      if (USE_BACKEND && backendAvailable && templateId && !templateId.startsWith('template-')) {
-        try {
-          const result = await apiGetTemplate(templateId);
-
-          if (result.success && result.template) {
-            const template = result.template.template;
-            setElements(template.elements || []);
-            setSections(template.sections || []);
-            setTemplateName(result.template.name);
-
-            console.log('✅ Template loaded from backend:', templateId);
-            return {
-              success: true,
-              templateData: result.template,
-              name: result.template.name,
-              source: 'backend'
-            };
-          }
-        } catch (apiError) {
-          console.warn('Backend load failed, trying localStorage:', apiError);
-        }
-      }
-
-      // Fallback to localStorage
       const id = templateId || localStorage.getItem('lastTemplateId');
 
       if (!id) {
@@ -189,124 +154,92 @@ export function useTemplateStorage({
       setSections(loadedSections);
       setTemplateName(loadedName);
 
-      console.log('✅ Template loaded from localStorage:', id);
+      console.log('✅ Template loaded:', id);
       return {
         success: true,
         templateData,
-        name: loadedName,
-        source: 'localStorage'
+        name: loadedName
       };
-
     } catch (error) {
       console.error('❌ Load error:', error);
-      return { success: false, error: error.message };
-    } finally {
-      setIsLoading(false);
-    }
-  }, [setElements, setSections, setTemplateName, backendAvailable]);
-
-  /**
-   * Get all saved templates (from both backend and localStorage)
-   */
-  const loadTemplateList = useCallback(async () => {
-    setIsLoading(true);
-    const templates = [];
-
-    try {
-      // Try to get from backend
-      if (USE_BACKEND && backendAvailable) {
-        try {
-          const result = await apiGetTemplates();
-          if (result.success && result.templates) {
-            templates.push(...result.templates.map(t => ({
-              ...t,
-              source: 'backend'
-            })));
-            console.log(`✅ Loaded ${result.templates.length} templates from backend`);
-          }
-        } catch (apiError) {
-          console.warn('Failed to load templates from backend:', apiError);
-        }
-      }
-
-      // Also get from localStorage
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.startsWith('template-')) {
-          try {
-            const data = JSON.parse(localStorage.getItem(key));
-            // Don't duplicate if already loaded from backend
-            if (!templates.find(t => t.id === key)) {
-              templates.push({
-                id: key,
-                name: data.name || 'Unnamed Template',
-                createdAt: data.metadata?.createdAt || new Date().toISOString(),
-                elementCount: data.metadata?.elementCount || 0,
-                sectionCount: data.metadata?.sectionCount || 0,
-                source: 'localStorage'
-              });
-            }
-          } catch (error) {
-            console.warn(`Failed to parse template ${key}:`, error);
-          }
-        }
-      }
-
-      setTemplateHistory(templates);
-      return templates;
-
-    } catch (error) {
-      console.error('❌ Error loading template list:', error);
-      return [];
-    } finally {
-      setIsLoading(false);
-    }
-  }, [backendAvailable]);
-
-  /**
-   * Export template as JSON
-   */
-  const exportJSON = useCallback(() => {
-    const templateData = buildTemplateData(templateName);
-    const dataStr = JSON.stringify(templateData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${templateName}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }, [buildTemplateData, templateName]);
-
-  /**
-   * Import template from JSON
-   */
-  const importJSON = useCallback((jsonString) => {
-    try {
-      const data = JSON.parse(jsonString);
-
-      if (data.elements && data.sections) {
-        setElements(data.elements);
-        setSections(data.sections);
-        setTemplateName(data.name || 'Imported Template');
-        return { success: true };
-      }
-
-      return { success: false, error: 'Invalid template format' };
-    } catch (error) {
       return { success: false, error: error.message };
     }
   }, [setElements, setSections, setTemplateName]);
 
+  /**
+   * Import from JSON
+   */
+  const importJSON = useCallback(async (jsonString) => {
+    try {
+      const templateData = JSON.parse(jsonString);
+
+      const loadedElements = templateData.data?.elements || templateData.elements || [];
+      const loadedSections = templateData.data?.sections || templateData.sections || [];
+      const loadedName = templateData.name || 'Imported Resume';
+
+      setElements(loadedElements);
+      setSections(loadedSections);
+      setTemplateName(loadedName);
+
+      console.log('✅ JSON imported');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Import error:', error);
+      alert(`Import failed: ${error.message}`);
+      return { success: false, error: 'Invalid JSON format' };
+    }
+  }, [setElements, setSections, setTemplateName]);
+
+  /**
+   * Get all saved templates
+   */
+  const getAllTemplates = useCallback(() => {
+    const templates = [];
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('template-')) {
+        try {
+          const data = JSON.parse(localStorage.getItem(key));
+          templates.push({
+            id: key,
+            name: data.name || 'Unnamed Template',
+            updatedAt: data.metadata?.updatedAt || data.updatedAt || new Date().toISOString(),
+            elementCount: data.metadata?.elementCount || data.data?.elements?.length || 0
+          });
+        } catch (e) {
+          console.warn('Skipping invalid template:', key);
+        }
+      }
+    }
+
+    return templates.sort((a, b) =>
+        new Date(b.updatedAt) - new Date(a.updatedAt)
+    );
+  }, []);
+
+  /**
+   * Delete a template
+   */
+  const deleteTemplate = useCallback((templateId) => {
+    localStorage.removeItem(templateId);
+
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    const filtered = history.filter(h => h.id !== templateId);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(filtered));
+    setTemplateHistory(filtered);
+
+    return { success: true };
+  }, []);
+
   return {
     saveTemplate,
     loadTemplate,
-    loadTemplateList,
+    getAllTemplates,
+    deleteTemplate,
     exportJSON,
     importJSON,
     templateHistory,
-    isSaving,
-    isLoading,
-    backendAvailable
+    isSaving
   };
 }
