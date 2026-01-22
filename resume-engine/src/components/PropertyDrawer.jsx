@@ -1,67 +1,59 @@
 /**
- * PropertyDrawer Component
- * =========================
+ * PropertyDrawer Component (FIXED)
+ * ==================================
  * A slide-out panel for editing element/section properties.
+ *
+ * FIXES:
+ * - Removed backdrop blur that was obscuring the canvas
+ * - Drawer now appears as a side panel without blocking the view
+ * - Can still see and interact with canvas while drawer is open
  */
 
 import { ATS_FRIENDLY_FONTS, ATS_SECTION_HEADERS } from '../utils/constants';
 import { isATSFriendlyFont } from '../utils/helpers';
 
 export function PropertyDrawer({
-  item,
-  onChange,
-  onDelete,
-  onClose
-}) {
-  const isSection = item.isSection;
+                                   item,
+                                   onChange,
+                                   onDelete,
+                                   onClose
+                               }) {
+    const isSection = item.isSection;
 
-  return (
-    <>
-      {/* Backdrop */}
-      <div className="drawer-backdrop" onClick={onClose} />
+    return (
+        <>
+            {/* Drawer - NO BACKDROP, just the panel */}
+            <div className="drawer">
+                {/* Header */}
+                <div className="drawer-header">
+                    <h3 className="drawer-title">
+                        {isSection ? '📦 Edit Section' : '✏️ Edit Element'}
+                    </h3>
+                    <button className="drawer-close" onClick={onClose}>×</button>
+                </div>
 
-      {/* Drawer */}
-      <div className="drawer">
-        {/* Header */}
-        <div className="drawer-header">
-          <h3 className="drawer-title">
-            {isSection ? '📦 Edit Section' : '✏️ Edit Element'}
-          </h3>
-          <button className="drawer-close" onClick={onClose}>×</button>
-        </div>
+                {/* Content */}
+                <div className="drawer-content">
+                    {isSection ? (
+                        <SectionProperties item={item} onChange={onChange} />
+                    ) : (
+                        <ElementProperties item={item} onChange={onChange} />
+                    )}
+                </div>
 
-        {/* Content */}
-        <div className="drawer-content">
-          {isSection ? (
-            <SectionProperties item={item} onChange={onChange} />
-          ) : (
-            <ElementProperties item={item} onChange={onChange} />
-          )}
-        </div>
+                {/* Footer */}
+                <div className="drawer-footer">
+                    <button className="btn btn-secondary" onClick={onClose}>
+                        Close
+                    </button>
+                    <button className="btn btn-danger" onClick={onDelete}>
+                        🗑️ Delete
+                    </button>
+                </div>
+            </div>
 
-        {/* Footer */}
-        <div className="drawer-footer">
-          <button className="btn btn-secondary" onClick={onClose}>
-            Close
-          </button>
-          <button className="btn btn-danger" onClick={onDelete}>
-            🗑️ Delete
-          </button>
-        </div>
-      </div>
-
-      <style>{`
-        .drawer-backdrop {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.3);
-          backdrop-filter: blur(2px);
-          z-index: 999;
-          animation: fadeIn 0.2s ease;
-        }
+            <style>{`
+        /* REMOVED .drawer-backdrop - no more screen blur! */
 
         .drawer {
           position: fixed;
@@ -75,11 +67,7 @@ export function PropertyDrawer({
           display: flex;
           flex-direction: column;
           animation: slideIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+          border-left: 1px solid #e5e7eb;
         }
 
         @keyframes slideIn {
@@ -218,50 +206,19 @@ export function PropertyDrawer({
         }
 
         .alignment-btn:hover {
-          border-color: #d1d5db;
+          border-color: #3b82f6;
+          background: #f0f9ff;
         }
 
         .alignment-btn.active {
           border-color: #3b82f6;
           background: #eff6ff;
-        }
-
-        .range-slider {
-          width: 100%;
-          height: 6px;
-          cursor: pointer;
-        }
-
-        .range-labels {
-          display: flex;
-          justify-content: space-between;
-          font-size: 11px;
-          color: #9ca3af;
-          margin-top: 6px;
-        }
-
-        .divider {
-          height: 1px;
-          background: #e5e7eb;
-          margin: 16px 0;
-        }
-
-        .ats-warning {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 12px;
-          background: #fef3c7;
-          border: 1px solid #fcd34d;
-          border-radius: 8px;
-          font-size: 12px;
-          color: #92400e;
-          margin-top: 8px;
+          color: #3b82f6;
         }
 
         .btn {
           flex: 1;
-          padding: 12px;
+          padding: 10px 16px;
           border: none;
           border-radius: 8px;
           font-size: 14px;
@@ -271,318 +228,387 @@ export function PropertyDrawer({
         }
 
         .btn-secondary {
-          background: white;
-          border: 2px solid #e5e7eb;
+          background: #f3f4f6;
           color: #374151;
         }
 
         .btn-secondary:hover {
-          background: #f3f4f6;
+          background: #e5e7eb;
         }
 
         .btn-danger {
-          background: #ef4444;
-          color: white;
+          background: #fee2e2;
+          color: #dc2626;
         }
 
         .btn-danger:hover {
-          background: #dc2626;
+          background: #fecaca;
+        }
+
+        .ats-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 8px;
+          background: #d1fae5;
+          color: #065f46;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .ats-badge.warning {
+          background: #fef3c7;
+          color: #92400e;
+        }
+
+        .divider {
+          height: 1px;
+          background: #e5e7eb;
+          margin: 20px 0;
         }
       `}</style>
-    </>
-  );
+        </>
+    );
 }
 
 /**
- * Element Properties Editor
+ * Element Properties
  */
 function ElementProperties({ item, onChange }) {
-  const fontWarning = item.fontFamily && !isATSFriendlyFont(item.fontFamily);
+    const fontWarning = !isATSFriendlyFont(item.fontFamily);
 
-  return (
-    <>
-      {/* Name */}
-      <div className="field-group">
-        <label className="field-label">
-          📌 Element Name <span className="field-hint">(for reference)</span>
-        </label>
-        <input
-          type="text"
-          className="field-input"
-          value={item.name || ''}
-          onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="e.g., Job Title, Company Name"
-        />
-      </div>
+    return (
+        <>
+            {/* Content */}
+            <div className="field-group">
+                <label className="field-label">Content</label>
+                <textarea
+                    className="field-textarea"
+                    value={item.content || ''}
+                    onChange={(e) => onChange({ content: e.target.value })}
+                    placeholder="Enter text content..."
+                />
+            </div>
 
-      {/* Content */}
-      <div className="field-group">
-        <label className="field-label">📝 Content</label>
-        <textarea
-          className="field-textarea"
-          value={item.content || ''}
-          onChange={(e) => onChange({ content: e.target.value })}
-          rows={3}
-        />
-      </div>
+            {/* Typography */}
+            <div className="field-group">
+                <label className="field-label">Font Family</label>
+                <select
+                    className="field-select"
+                    value={item.fontFamily || 'Arial'}
+                    onChange={(e) => onChange({ fontFamily: e.target.value })}
+                >
+                    {ATS_FRIENDLY_FONTS.map(font => (
+                        <option key={font} value={font}>{font}</option>
+                    ))}
+                </select>
+                {fontWarning && (
+                    <span className="ats-badge warning" style={{ marginTop: '8px', display: 'inline-flex' }}>
+            ⚠️ Not ATS-friendly
+          </span>
+                )}
+            </div>
 
-      {/* ATS Field */}
-      <div className="field-group">
-        <label className="field-label">
-          🎯 ATS Field <span className="field-hint">(helps ATS parsing)</span>
-        </label>
-        <select
-          className="field-select"
-          value={item.atsField || ''}
-          onChange={(e) => onChange({ atsField: e.target.value || null })}
-        >
-          <option value="">None</option>
-          <option value="name">Full Name</option>
-          <option value="email">Email</option>
-          <option value="phone">Phone</option>
-          <option value="location">Location</option>
-          <option value="linkedin">LinkedIn</option>
-          <option value="website">Website</option>
-          <option value="job-title">Job Title</option>
-          <option value="company">Company Name</option>
-          <option value="date">Date/Duration</option>
-          <option value="degree">Degree</option>
-          <option value="school">School Name</option>
-          <option value="skill">Skill</option>
-        </select>
-      </div>
+            <div className="field-row">
+                <div className="field-group" style={{ flex: 1 }}>
+                    <label className="field-label">Font Size</label>
+                    <input
+                        className="field-input"
+                        type="number"
+                        min="8"
+                        max="72"
+                        value={item.fontSize || 12}
+                        onChange={(e) => onChange({ fontSize: parseInt(e.target.value) })}
+                    />
+                </div>
 
-      <div className="divider" />
+                <div className="field-group" style={{ flex: 1 }}>
+                    <label className="field-label">Line Height</label>
+                    <input
+                        className="field-input"
+                        type="number"
+                        min="1"
+                        max="3"
+                        step="0.1"
+                        value={item.lineHeight || 1.4}
+                        onChange={(e) => onChange({ lineHeight: parseFloat(e.target.value) })}
+                    />
+                </div>
+            </div>
 
-      {/* Text Alignment */}
-      <div className="field-group">
-        <label className="field-label">⬅️ Text Alignment</label>
-        <div className="alignment-buttons">
-          {[
-            { value: 'left', icon: '⬅️' },
-            { value: 'center', icon: '↔️' },
-            { value: 'right', icon: '➡️' },
-            { value: 'justify', icon: '⬌' }
-          ].map(({ value, icon }) => (
-            <button
-              key={value}
-              className={`alignment-btn ${(item.textAlign || 'left') === value ? 'active' : ''}`}
-              onClick={() => onChange({ textAlign: value })}
-            >
-              {icon}
-            </button>
-          ))}
-        </div>
-      </div>
+            {/* Font Weight */}
+            <div className="field-group">
+                <label className="field-label">Font Weight</label>
+                <select
+                    className="field-select"
+                    value={item.fontWeight || 'normal'}
+                    onChange={(e) => onChange({ fontWeight: e.target.value })}
+                >
+                    <option value="normal">Normal</option>
+                    <option value="bold">Bold</option>
+                    <option value="300">Light</option>
+                    <option value="600">Semi-Bold</option>
+                </select>
+            </div>
 
-      {/* Font Family */}
-      <div className="field-group">
-        <label className="field-label">🔤 Font Family</label>
-        <select
-          className="field-select"
-          value={item.fontFamily || 'Arial'}
-          onChange={(e) => onChange({ fontFamily: e.target.value })}
-        >
-          <optgroup label="ATS-Friendly Fonts">
-            {ATS_FRIENDLY_FONTS.map(font => (
-              <option key={font} value={font}>{font}</option>
-            ))}
-          </optgroup>
-        </select>
-        {fontWarning && (
-          <div className="ats-warning">
-            ⚠️ This font may not be ATS-friendly
-          </div>
-        )}
-      </div>
+            {/* Text Alignment */}
+            <div className="field-group">
+                <label className="field-label">Text Alignment</label>
+                <div className="alignment-buttons">
+                    {['left', 'center', 'right', 'justify'].map(align => (
+                        <button
+                            key={align}
+                            className={`alignment-btn ${item.textAlign === align ? 'active' : ''}`}
+                            onClick={() => onChange({ textAlign: align })}
+                            title={align}
+                        >
+                            {align === 'left' && '⬅️'}
+                            {align === 'center' && '↔️'}
+                            {align === 'right' && '➡️'}
+                            {align === 'justify' && '⬌'}
+                        </button>
+                    ))}
+                </div>
+            </div>
 
-      {/* Font Size */}
-      <div className="field-group">
-        <label className="field-label">
-          📏 Font Size: <span style={{ color: '#3b82f6' }}>{item.fontSize || 14}px</span>
-        </label>
-        <input
-          type="range"
-          className="range-slider"
-          min="8"
-          max="48"
-          value={item.fontSize || 14}
-          onChange={(e) => onChange({ fontSize: parseInt(e.target.value) })}
-        />
-        <div className="range-labels">
-          <span>8px</span>
-          <span>48px</span>
-        </div>
-      </div>
+            <div className="divider" />
 
-      {/* Font Weight */}
-      <div className="field-group">
-        <label className="field-label">💪 Font Weight</label>
-        <select
-          className="field-select"
-          value={item.fontWeight || 'normal'}
-          onChange={(e) => onChange({ fontWeight: e.target.value })}
-        >
-          <option value="300">Light (300)</option>
-          <option value="normal">Normal (400)</option>
-          <option value="500">Medium (500)</option>
-          <option value="600">Semi-Bold (600)</option>
-          <option value="bold">Bold (700)</option>
-          <option value="800">Extra Bold (800)</option>
-        </select>
-      </div>
+            {/* Color */}
+            <div className="field-group">
+                <label className="field-label">Text Color</label>
+                <div className="field-row">
+                    <input
+                        className="color-picker"
+                        type="color"
+                        value={item.color || '#000000'}
+                        onChange={(e) => onChange({ color: e.target.value })}
+                    />
+                    <input
+                        className="field-input"
+                        type="text"
+                        value={item.color || '#000000'}
+                        onChange={(e) => onChange({ color: e.target.value })}
+                        placeholder="#000000"
+                    />
+                </div>
+            </div>
 
-      {/* Text Color */}
-      <div className="field-group">
-        <label className="field-label">🎨 Text Color</label>
-        <div className="field-row">
-          <input
-            type="color"
-            className="color-picker"
-            value={item.color || '#000000'}
-            onChange={(e) => onChange({ color: e.target.value })}
-          />
-          <input
-            type="text"
-            className="field-input"
-            value={item.color || '#000000'}
-            onChange={(e) => {
-              if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
-                onChange({ color: e.target.value });
-              }
-            }}
-            style={{ fontFamily: 'monospace' }}
-          />
-        </div>
-      </div>
-    </>
-  );
+            {/* Position & Size */}
+            <div className="divider" />
+
+            <div className="field-row">
+                <div className="field-group" style={{ flex: 1 }}>
+                    <label className="field-label">X Position</label>
+                    <input
+                        className="field-input"
+                        type="number"
+                        value={Math.round(item.x || 0)}
+                        onChange={(e) => onChange({ x: parseInt(e.target.value) })}
+                    />
+                </div>
+
+                <div className="field-group" style={{ flex: 1 }}>
+                    <label className="field-label">Y Position</label>
+                    <input
+                        className="field-input"
+                        type="number"
+                        value={Math.round(item.y || 0)}
+                        onChange={(e) => onChange({ y: parseInt(e.target.value) })}
+                    />
+                </div>
+            </div>
+
+            <div className="field-row">
+                <div className="field-group" style={{ flex: 1 }}>
+                    <label className="field-label">Width</label>
+                    <input
+                        className="field-input"
+                        type="number"
+                        min="50"
+                        value={Math.round(item.width || 200)}
+                        onChange={(e) => onChange({ width: parseInt(e.target.value) })}
+                    />
+                </div>
+
+                <div className="field-group" style={{ flex: 1 }}>
+                    <label className="field-label">Height</label>
+                    <input
+                        className="field-input"
+                        type="number"
+                        min="20"
+                        value={Math.round(item.height || 40)}
+                        onChange={(e) => onChange({ height: parseInt(e.target.value) })}
+                    />
+                </div>
+            </div>
+        </>
+    );
 }
 
 /**
- * Section Properties Editor
+ * Section Properties
  */
 function SectionProperties({ item, onChange }) {
-  return (
-    <>
-      {/* Title */}
-      <div className="field-group">
-        <label className="field-label">📌 Section Title</label>
-        <input
-          type="text"
-          className="field-input"
-          value={item.title || ''}
-          onChange={(e) => onChange({ title: e.target.value })}
-          placeholder="e.g., Experience, Education"
-        />
-      </div>
+    const sectionHeaders = Object.keys(ATS_SECTION_HEADERS);
 
-      {/* ATS Header Type */}
-      <div className="field-group">
-        <label className="field-label">
-          🎯 ATS Section Type <span className="field-hint">(standard headers)</span>
-        </label>
-        <select
-          className="field-select"
-          value={item.atsHeader || ''}
-          onChange={(e) => {
-            const type = e.target.value;
-            const config = ATS_SECTION_HEADERS[type];
-            onChange({
-              atsHeader: type || null,
-              title: config?.title || item.title,
-              contentType: config?.contentType || item.contentType
-            });
-          }}
-        >
-          <option value="">Custom Section</option>
-          {Object.entries(ATS_SECTION_HEADERS).map(([key, config]) => (
-            <option key={key} value={key}>{config.title}</option>
-          ))}
-        </select>
-      </div>
+    return (
+        <>
+            {/* Title */}
+            <div className="field-group">
+                <label className="field-label">
+                    Section Title
+                    <span className="field-hint"> - Critical for ATS parsing</span>
+                </label>
+                <input
+                    className="field-input"
+                    type="text"
+                    value={item.title || ''}
+                    onChange={(e) => onChange({ title: e.target.value })}
+                    placeholder="e.g., Experience, Education, Skills"
+                />
+            </div>
 
-      {/* Content Type */}
-      <div className="field-group">
-        <label className="field-label">📋 Content Type</label>
-        <select
-          className="field-select"
-          value={item.contentType || 'text'}
-          onChange={(e) => onChange({ contentType: e.target.value })}
-        >
-          <option value="text">📝 Text - Free form paragraphs</option>
-          <option value="list-items">📋 List - Bullet points</option>
-          <option value="list-sections">📦 Entries - Job/Education entries</option>
-        </select>
-      </div>
+            {/* ATS-Friendly Titles */}
+            <div className="field-group">
+                <label className="field-label">Common ATS Titles</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {sectionHeaders.map(key => (
+                        <button
+                            key={key}
+                            className="ats-badge"
+                            style={{ cursor: 'pointer', border: 'none' }}
+                            onClick={() => onChange({ title: ATS_SECTION_HEADERS[key].title })}
+                        >
+                            {ATS_SECTION_HEADERS[key].title}
+                        </button>
+                    ))}
+                </div>
+            </div>
 
-      {/* Layout Direction */}
-      <div className="field-group">
-        <label className="field-label">↕️ Layout Direction</label>
-        <select
-          className="field-select"
-          value={item.direction || 'vertical'}
-          onChange={(e) => onChange({ direction: e.target.value })}
-        >
-          <option value="vertical">↓ Vertical - Stack items</option>
-          <option value="horizontal">→ Horizontal - Side by side</option>
-        </select>
-        {item.direction === 'horizontal' && (
-          <div className="ats-warning">
-            ⚠️ Horizontal layouts may affect ATS parsing
-          </div>
-        )}
-      </div>
+            {/* Content Type */}
+            <div className="field-group">
+                <label className="field-label">Content Type</label>
+                <select
+                    className="field-select"
+                    value={item.contentType || 'text'}
+                    onChange={(e) => onChange({ contentType: e.target.value })}
+                >
+                    <option value="text">📝 Text Block</option>
+                    <option value="list-items">📋 List Items (bullets)</option>
+                    <option value="list-sections">📦 Sub-sections (entries)</option>
+                </select>
+            </div>
 
-      <div className="divider" />
+            {/* Layout Direction */}
+            <div className="field-group">
+                <label className="field-label">Layout Direction</label>
+                <div className="alignment-buttons">
+                    <button
+                        className={`alignment-btn ${item.direction === 'vertical' ? 'active' : ''}`}
+                        onClick={() => onChange({ direction: 'vertical' })}
+                    >
+                        ↓ Vertical
+                    </button>
+                    <button
+                        className={`alignment-btn ${item.direction === 'horizontal' ? 'active' : ''}`}
+                        onClick={() => onChange({ direction: 'horizontal' })}
+                    >
+                        → Horizontal
+                    </button>
+                </div>
+            </div>
 
-      {/* Background Color */}
-      <div className="field-group">
-        <label className="field-label">🎨 Background Color</label>
-        <div className="field-row">
-          <input
-            type="color"
-            className="color-picker"
-            value={item.backgroundColor || '#ffffff'}
-            onChange={(e) => onChange({ backgroundColor: e.target.value })}
-          />
-          <input
-            type="text"
-            className="field-input"
-            value={item.backgroundColor || '#ffffff'}
-            onChange={(e) => {
-              if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
-                onChange({ backgroundColor: e.target.value });
-              }
-            }}
-            style={{ fontFamily: 'monospace' }}
-          />
-        </div>
-      </div>
+            <div className="divider" />
 
-      {/* Border Color */}
-      <div className="field-group">
-        <label className="field-label">🖌️ Border Color</label>
-        <div className="field-row">
-          <input
-            type="color"
-            className="color-picker"
-            value={item.borderColor || '#e5e7eb'}
-            onChange={(e) => onChange({ borderColor: e.target.value })}
-          />
-          <input
-            type="text"
-            className="field-input"
-            value={item.borderColor || '#e5e7eb'}
-            onChange={(e) => {
-              if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
-                onChange({ borderColor: e.target.value });
-              }
-            }}
-            style={{ fontFamily: 'monospace' }}
-          />
-        </div>
-      </div>
-    </>
-  );
+            {/* Background Color */}
+            <div className="field-group">
+                <label className="field-label">Background Color</label>
+                <div className="field-row">
+                    <input
+                        className="color-picker"
+                        type="color"
+                        value={item.backgroundColor || '#ffffff'}
+                        onChange={(e) => onChange({ backgroundColor: e.target.value })}
+                    />
+                    <input
+                        className="field-input"
+                        type="text"
+                        value={item.backgroundColor || '#ffffff'}
+                        onChange={(e) => onChange({ backgroundColor: e.target.value })}
+                        placeholder="#ffffff"
+                    />
+                </div>
+            </div>
+
+            {/* Border Color */}
+            <div className="field-group">
+                <label className="field-label">Border Color</label>
+                <div className="field-row">
+                    <input
+                        className="color-picker"
+                        type="color"
+                        value={item.borderColor || '#e5e7eb'}
+                        onChange={(e) => onChange({ borderColor: e.target.value })}
+                    />
+                    <input
+                        className="field-input"
+                        type="text"
+                        value={item.borderColor || '#e5e7eb'}
+                        onChange={(e) => onChange({ borderColor: e.target.value })}
+                        placeholder="#e5e7eb"
+                    />
+                </div>
+            </div>
+
+            {/* Position & Size */}
+            <div className="divider" />
+
+            <div className="field-row">
+                <div className="field-group" style={{ flex: 1 }}>
+                    <label className="field-label">X Position</label>
+                    <input
+                        className="field-input"
+                        type="number"
+                        value={Math.round(item.x || 0)}
+                        onChange={(e) => onChange({ x: parseInt(e.target.value) })}
+                    />
+                </div>
+
+                <div className="field-group" style={{ flex: 1 }}>
+                    <label className="field-label">Y Position</label>
+                    <input
+                        className="field-input"
+                        type="number"
+                        value={Math.round(item.y || 0)}
+                        onChange={(e) => onChange({ y: parseInt(e.target.value) })}
+                    />
+                </div>
+            </div>
+
+            <div className="field-row">
+                <div className="field-group" style={{ flex: 1 }}>
+                    <label className="field-label">Width</label>
+                    <input
+                        className="field-input"
+                        type="number"
+                        min="100"
+                        value={Math.round(item.width || 400)}
+                        onChange={(e) => onChange({ width: parseInt(e.target.value) })}
+                    />
+                </div>
+
+                <div className="field-group" style={{ flex: 1 }}>
+                    <label className="field-label">Height</label>
+                    <input
+                        className="field-input"
+                        type="number"
+                        min="50"
+                        value={Math.round(item.height || 200)}
+                        onChange={(e) => onChange({ height: parseInt(e.target.value) })}
+                    />
+                </div>
+            </div>
+        </>
+    );
 }

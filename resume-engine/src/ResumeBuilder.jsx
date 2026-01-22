@@ -1,18 +1,11 @@
 /**
- * 🎯 ATS-FRIENDLY RESUME BUILDER
+ * ResumeBuilder.jsx - RESIZE FIX
  * ================================
- * A modern, modular resume builder designed for both visual appeal
- * and ATS (Applicant Tracking System) compatibility.
  *
- * Architecture:
- * - ResumeBuilder.jsx (Main orchestrator)
- * - /hooks (Custom hooks for state & logic)
- * - /components (UI components)
- * - /utils (Helpers & constants)
- * - /context (Global state management)
+ * FIXES:
+ * 1. Connected resize handlers properly to useDragAndDrop hook
+ * 2. Now sections and elements can be resized using drag handles
  */
-
-
 
 import { useState, useRef, useCallback } from 'react';
 
@@ -82,7 +75,8 @@ function ResumeBuilder() {
     isDragging,
     selectionBox,
     handleDragStart,
-    handleCanvasMouseDown
+    handleCanvasMouseDown,
+    handleResizeStart  // ← IMPORTANT: Get resize handler from hook
   } = useDragAndDrop({
     elements,
     sections,
@@ -177,152 +171,153 @@ function ResumeBuilder() {
   const handleCloseDrawer = useCallback(() => {
     setDrawerOpen(false);
     setEditingItem(null);
-    clearSelection();
-  }, [clearSelection]);
+    // DON'T clear selection - keep item selected but close drawer
+  }, []);
 
   return (
-    <ResumeProvider value={{
-      elements,
-      sections,
-      selectedIds,
-      templateName,
-      atsScore
-    }}>
-      <div className="resume-builder">
-        {/* Command Palette (Cmd+K) */}
-        {showCommandPalette && (
-          <CommandPalette
-            onClose={() => setShowCommandPalette(false)}
-            onAddSection={addSection}
-            onExport={() => setShowExportModal(true)}
-            onSave={saveTemplate}
-            onLoad={() => setShowTemplateGallery(true)}
-          />
-        )}
-
-        {/* Export Modal */}
-        {showExportModal && (
-          <ExportModal
-            elements={elements}
-            sections={sections}
-            templateName={templateName}
-            onClose={() => setShowExportModal(false)}
-          />
-        )}
-
-        {/* Template Gallery */}
-        {showTemplateGallery && (
-          <TemplateGallery
-            onSelect={(template) => {
-              setElements(template.elements);
-              setSections(template.sections);
-              setTemplateName(template.name);
-              setShowTemplateGallery(false);
-            }}
-            onClose={() => setShowTemplateGallery(false)}
-          />
-        )}
-
-        {/* Main Toolbar */}
-        <Toolbar
-          templateName={templateName}
-          onTemplateNameChange={setTemplateName}
-          onAddSection={addSection}
-          onSave={saveTemplate}
-          onLoad={() => setShowTemplateGallery(true)}
-          onExport={() => setShowExportModal(true)}
-          onExportJSON={exportJSON}
-          activeView={activeView}
-          onViewChange={setActiveView}
-          selectedCount={selectedIds.length}
-          atsScore={atsScore}
-        />
-
-        {/* Main Content Area */}
-        <div className="builder-content">
-          {/* Left Panel - ATS Analysis */}
-          {activeView === 'ats' && (
-            <ATSScorePanel
-              score={atsScore}
-              suggestions={suggestions}
-              onAnalyze={analyzeResume}
-            />
+      <ResumeProvider value={{
+        elements,
+        sections,
+        selectedIds,
+        templateName,
+        atsScore
+      }}>
+        <div className="resume-builder">
+          {/* Command Palette (Cmd+K) */}
+          {showCommandPalette && (
+              <CommandPalette
+                  onClose={() => setShowCommandPalette(false)}
+                  onAddSection={addSection}
+                  onExport={() => setShowExportModal(true)}
+                  onSave={saveTemplate}
+                  onLoad={() => setShowTemplateGallery(true)}
+              />
           )}
 
-          {activeView === 'editor' && (
-            <KeywordAnalyzer
-              elements={elements}
-              onSuggestion={(keyword, elementId) => {
-                // Handle keyword suggestions
-              }}
-            />
+          {/* Export Modal */}
+          {showExportModal && (
+              <ExportModal
+                  elements={elements}
+                  sections={sections}
+                  templateName={templateName}
+                  onClose={() => setShowExportModal(false)}
+              />
           )}
 
-          {/* Canvas */}
-          <Canvas
-            ref={canvasRef}
-            elements={elements}
-            sections={sections}
-            selectedIds={selectedIds}
-            isDragging={isDragging}
-            selectionBox={selectionBox}
-            activeView={activeView}
-            onElementMouseDown={(e, id) => {
-              handleSelectionChange([id]);
-              handleDragStart(e, id);
-            }}
-            onCanvasMouseDown={handleCanvasMouseDown}
-            onDoubleClick={(e, parentSection) => {
-              const rect = canvasRef.current.getBoundingClientRect();
-              const x = e.clientX - rect.left;
-              const y = e.clientY - rect.top;
+          {/* Template Gallery */}
+          {showTemplateGallery && (
+              <TemplateGallery
+                  onSelect={(template) => {
+                    setElements(template.elements);
+                    setSections(template.sections);
+                    setTemplateName(template.name);
+                    setShowTemplateGallery(false);
+                  }}
+                  onClose={() => setShowTemplateGallery(false)}
+              />
+          )}
 
-              if (parentSection) {
-                addContentToSection(parentSection, { x, y });
-              } else {
-                addElement({
-                  type: 'text',
-                  content: 'New Text',
-                  x: x - 50,
-                  y: y - 15
-                });
-              }
-            }}
-            onUpdateElement={updateElement}
-            onUpdateSection={updateSection}
-            onAddContentToSection={addContentToSection}
+          {/* Main Toolbar */}
+          <Toolbar
+              templateName={templateName}
+              onTemplateNameChange={setTemplateName}
+              onAddSection={addSection}
+              onSave={saveTemplate}
+              onLoad={() => setShowTemplateGallery(true)}
+              onExport={() => setShowExportModal(true)}
+              onExportJSON={exportJSON}
+              activeView={activeView}
+              onViewChange={setActiveView}
+              selectedCount={selectedIds.length}
+              atsScore={atsScore}
           />
 
-          {/* Property Drawer */}
-          {drawerOpen && editingItem && (
-            <PropertyDrawer
-              item={editingItem}
-              onChange={handlePropertyChange}
-              onDelete={handleDelete}
-              onClose={handleCloseDrawer}
-            />
-          )}
-        </div>
+          {/* Main Content Area */}
+          <div className="builder-content">
+            {/* Left Panel - ATS Analysis */}
+            {activeView === 'ats' && (
+                <ATSScorePanel
+                    score={atsScore}
+                    suggestions={suggestions}
+                    onAnalyze={analyzeResume}
+                />
+            )}
 
-        {/* Status Bar */}
-        <div className="status-bar">
+            {activeView === 'editor' && (
+                <KeywordAnalyzer
+                    elements={elements}
+                    onSuggestion={(keyword, elementId) => {
+                      // Handle keyword suggestions
+                    }}
+                />
+            )}
+
+            {/* Canvas */}
+            <Canvas
+                ref={canvasRef}
+                elements={elements}
+                sections={sections}
+                selectedIds={selectedIds}
+                isDragging={isDragging}
+                selectionBox={selectionBox}
+                activeView={activeView}
+                onElementMouseDown={(e, id) => {
+                  handleSelectionChange([id]);
+                  handleDragStart(e, id);
+                }}
+                onCanvasMouseDown={handleCanvasMouseDown}
+                onDoubleClick={(e, parentSection) => {
+                  const rect = canvasRef.current.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const y = e.clientY - rect.top;
+
+                  if (parentSection) {
+                    addContentToSection(parentSection, { x, y });
+                  } else {
+                    addElement({
+                      type: 'text',
+                      content: 'New Text',
+                      x: x - 50,
+                      y: y - 15
+                    });
+                  }
+                }}
+                onUpdateElement={updateElement}
+                onUpdateSection={updateSection}
+                onAddContentToSection={addContentToSection}
+                onResizeStart={handleResizeStart}  // ← FIXED: Now properly connected!
+            />
+
+            {/* Property Drawer */}
+            {drawerOpen && editingItem && (
+                <PropertyDrawer
+                    item={editingItem}
+                    onChange={handlePropertyChange}
+                    onDelete={handleDelete}
+                    onClose={handleCloseDrawer}
+                />
+            )}
+          </div>
+
+          {/* Status Bar */}
+          <div className="status-bar">
           <span className="status-item">
             {elements.length} elements • {sections.length} sections
           </span>
-          {selectedIds.length > 0 && (
-            <span className="status-item status-selected">
+            {selectedIds.length > 0 && (
+                <span className="status-item status-selected">
               {selectedIds.length} selected
             </span>
-          )}
-          <span className="status-item status-ats">
+            )}
+            <span className="status-item status-ats">
             ATS Score: {atsScore}%
           </span>
-          <span className="status-item status-hint">
+            <span className="status-item status-hint">
             Press ⌘K for commands
           </span>
+          </div>
         </div>
-      </div>
-    </ResumeProvider>
+      </ResumeProvider>
   );
 }
 
